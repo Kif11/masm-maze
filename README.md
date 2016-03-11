@@ -1,11 +1,11 @@
 # MASM Maze Game
 
-Simple console board game in x86 assembly
+Simple console maze game in x86 assembly
 
 Windows Usage:
 ```
 git clone https://github.com/Kif11/masm-maze
-boardGame.exe
+mazeGame.exe
 ```
 
 Gameplay Example:
