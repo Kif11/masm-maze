@@ -1,3 +1,7 @@
+; Simple console board game in x86 assembly
+; Author: Kirill Kovalevskiy
+; Email: kovalewskiy@gmail.com
+
 .586
 .model  flat, stdcall
 option casemap:none
@@ -8,22 +12,31 @@ includelib libvcruntime.lib
 includelib libucrt.lib
 includelib legacy_stdio_definitions.lib
 
+; Export system std functions
 extern printf:NEAR
 extern scanf:NEAR
 extern _getch:NEAR
 extern system:NEAR
 
 .data
+	; General global variables
 	gameBoardSize DD 10
 	singleChar DB "%c", 0
 	boardLine DB "%c", 0Ah, 0
 	playerPosition DB 0, 0
+	grassChar DD 02Eh ; .
 	currentChar DD 02Eh ; .
 	clearConsoleArg DD "slc"
 
+	; Possition of the currently
+	; drawn character
+	; It used to determin which object
+	; to place in a cell as well as
+	; player collisions
 	curX DD 0
 	curY DD 0
 
+	; Game objects positions
 	playerX DD 1
 	playerY DD 1
 	playerChar DD 050h ; P
@@ -40,10 +53,11 @@ extern system:NEAR
 	goalY DD 10
 	goalChar DD 47h ; G
 
+	; Game messages
 	startMsg DB "Welcome to the game. Use W, S, A, D to move around. Try to reach G. Avoid X. Press any key to start.", 0Ah, 0
 	winMsg DB "Congratulations! You won the game.", 0Ah, 0
     gameOverMsg DB "Game Over!", 0Ah, 0
-    health DD 10
+
 .code
 
 main PROC C
@@ -63,7 +77,7 @@ main PROC C
  MainLoop:	call _getch
  			mov edi, eax
 
-			; Clear system console
+			; Clear system console on every update
 			push offset clearConsoleArg
 			call system
 			add esp, 4
@@ -88,7 +102,6 @@ main PROC C
 				jne MoveUp
 				mov playerX, 1
 			@
-
 
 			; Check for move UP
 			MoveUp:
@@ -130,6 +143,7 @@ main PROC C
 				sub eax, 1
 				mov playerY, eax
 
+			; Check player and enemies collisions
 			CollisionCheck1:
 				mov eax, playerX
 				cmp eax, obstacle1X
@@ -150,6 +164,7 @@ main PROC C
 
 				jmp GameOver
 
+			; Check if player reach the goal
 			WinCheck:
 				mov eax, playerX
 				cmp eax, goalX
@@ -161,6 +176,7 @@ main PROC C
 				jmp WinState
 
  			Render:
+				; Rerender entire game board
 				call RenderGameBoard
 
  			jmp MainLoop
@@ -174,6 +190,8 @@ main PROC C
 		ret
 
 	WinState:
+		; This state is reach when
+		; the player reach the goal object
 		push offset winMsg
 		call printf
 		add esp, 4
@@ -186,7 +204,8 @@ main PROC C
    		ret
 
 	GameOver:
-
+		; This state is reach when
+		; the player hit one of the enemies
 		push offset gameOverMsg
 		call printf
 		add esp, 4
@@ -202,13 +221,22 @@ main ENDP
 
 
 RenderGameBoard PROC
+		COMMENT @
+		Render intire game board
+		Gloabal variables:
+		 	- gameBoardSize
+		 	- curX
+		 	- curY
+		@
+
 		push ebp
      	mov ebp,esp
 
 		mov ecx, gameBoardSize
 		lineLoop:
 
-			mov curX, ecx ; Store  current X coordinate
+			; Update  current X coordinate
+			mov curX, ecx
 
 			push gameBoardSize
 			call RenderLine
@@ -224,10 +252,12 @@ RenderGameBoard PROC
 RenderGameBoard ENDP
 
 SetCurrentCharacter MACRO xPos, yPos, charRepr, jumpToLable
-	; xPos - Item X position
-	; yPos - Item Y position
-	; charRepr - Item character representation
-	; jumpToLable -  Next procedure to jump to
+	COMMENT @
+	xPos - Item X position
+	yPos - Item Y position
+	charRepr - Item character representation
+	jumpToLable -  Next procedure to jump to
+	@
 
 	; Check for item position
 	mov eax, curX
@@ -237,16 +267,21 @@ SetCurrentCharacter MACRO xPos, yPos, charRepr, jumpToLable
 	mov eax, curY
 	cmp eax, yPos
 	jne jumpToLable
-	; If you here that's mean it's
+	; If you here that's means it's
 	; our player position
 	mov eax, charRepr
 	mov currentChar, eax
 endm
 
 RenderLine PROC
+		COMMENT @
+		:param gridSizeParam: Determine the width of the grid to draw
+		@
+
 		push ebp
      	mov ebp,esp
 
+		; Function parameters
 		gridSizeParam EQU [ebp + 8]
 
 		pusha ; Push general-purpose registers onto stack
@@ -299,6 +334,7 @@ RenderLine PROC
 				mov currentChar, eax
 
 			Goal:
+				; Check for goal position
 				mov eax, curX
 				cmp eax, goalX
 				jne PrintCurrentCharacter
@@ -314,12 +350,14 @@ RenderLine PROC
 				push [currentChar]
 				call PrintChar
 
-				mov currentChar, 02Eh ; Set char back to grass
+				; Set current draw char back to grass
+				mov eax, [grassChar]
+				mov currentChar, eax
 
 			sub ecx, 1 ; Decrement counter
 		jnz mainLoop
 
-		; Go to new line
+		; Go to a new line
 		push 0Ah
 		call PrintChar
 
@@ -333,6 +371,10 @@ RenderLine ENDP
 
 
 PrintChar PROC
+		COMMENT @
+		:param character: Determine current character to draw on the board
+		@
+
 		push ebp
      	mov ebp,esp
 
